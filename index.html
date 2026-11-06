@@ -1,1 +1,378 @@
-<h1>Тест</h1>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cuber — Kubernetes для новичка</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .readme { background: #fff; border-radius: .75rem; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+    .readme h1 { font-size: 1.9rem; margin-top: 2rem; }
+    .readme h2 { font-size: 1.4rem; margin-top: 1.75rem; }
+    .readme h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+    .readme p, .readme li { line-height: 1.65; }
+    pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: .5rem; overflow-x: auto; }
+    pre code { color: inherit; background: none; padding: 0; }
+    :not(pre) > code { background: #f1f3f5; color: #d63384; padding: .15rem .35rem; border-radius: .25rem; }
+    .readme img { max-width: 100%; height: auto; border-radius: .5rem; margin: 1rem 0; }
+    .table-sm td, .table-sm th { vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-dark bg-dark mb-4">
+    <div class="container">
+      <span class="navbar-brand mb-0 h1">mishka752 / cuber</span>
+    </div>
+  </nav>
+
+  <main class="container pb-5">
+    <article class="readme p-4 p-md-5">
+
+      <h1>Данный проект помогает разобраться с устройством Kubernetes(K8s), для новичка и научиться с ним работать</h1>
+
+      <h1>1. Часть первая «Docker»</h1>
+
+      <p>При разработке приложений часто возникает одна и та же проблема: у каждого разработчика своё окружение.<br>
+      Разные версии библиотек, интерпретаторов, системных зависимостей.<br>
+      В результате код, который стабильно работает на одном компьютере, может не запуститься на другом.</p>
+
+      <p>Docker решает эту проблему — он создаёт единый и воспроизводимый способ запускать приложения.</p>
+
+      <p>Основная идея: Docker — это платформа контейнеризации.<br>
+      Она позволяет упаковать приложение вместе со всеми зависимостями в изолированную среду — контейнер.</p>
+
+      <p>Такой контейнер можно запустить где угодно: на локальной машине, сервере или в облаке, и результат всегда будет одинаковым.</p>
+
+      <p>Главное отличие Docker от виртуальных машин заключается в том, что виртуальные машины эмулируют аппаратное обеспечение и запускают полноценную гостевую операционную систему, а Docker использует ядро хостовой ОС и изолирует только сами приложения.</p>
+
+      <img src="img/virtualnye-mashiny-i-kontejnery.jpg" alt="VM and Container">
+
+      <h2>Создание приложения</h2>
+
+      <p>Для начала создадим простое приложение на языке программирования <code>С++</code> и фреймворке <code>Crow</code> <a href="https://github.com/CrowCpp/Crow">GitHub Crow</a>.</p>
+
+      <p>Создайте папку <code>app</code> и в ней файл <code>main.cpp</code>:</p>
+
+<pre><code class="language-cpp">#include &lt;iostream&gt;
+#include &lt;crow.h&gt;
+
+int main() {
+    crow::SimpleApp app;
+
+    CROW_ROUTE(app, "/")([](crow::response&amp; res) {
+        res.set_static_file_info("app/site/index.html");
+        res.end();
+    });
+
+    app.port(8080).multithreaded().run();
+    return 0;
+}</code></pre>
+
+      <p>В папке <code>app</code> создайте папку <code>site</code> с файлом <code>index.html</code>:</p>
+
+<pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+    &lt;title&gt;Test docker&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1&gt;Simple docker&lt;/h1&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+
+      <p>Скачайте фреймворк <code>Crow</code> и скопируйте папку <code>include/</code> в <code>app/</code>. Затем перейдите на уровень выше и создайте <code>Makefile</code>:</p>
+
+<pre><code class="language-makefile">CC=g++
+
+CFLAGS=-c -I"app/include"
+
+SRC=app/main.cpp
+
+OBJ:=$(SRC:.cpp=.o)
+
+target: main
+
+main: $(OBJ)
+	$(CC) $&lt; -o $@
+
+%.o: %.cpp
+	$(CC) $(CFLAGS) $&lt; -o $@
+
+clean:
+	rm app/*.o main</code></pre>
+
+      <p>В этой же папке создайте <code>Dockerfile</code>:</p>
+
+<pre><code class="language-dockerfile"># Используем готовый образ Ubuntu
+FROM ubuntu:latest 
+
+# Устанавливаем необходимые библиотеки
+RUN apt-get update &amp;&amp; apt-get install -y \
+    g++ \
+    make \
+    libboost-all-dev \
+    libasio-dev
+
+# Копируем все файлы в контейнер
+COPY . /app
+
+# Задаем рабочий каталог для всех последующих команд
+WORKDIR /app
+
+# Сборка проекта
+RUN make
+
+# Запуск проекта
+CMD [ "./main" ]</code></pre>
+
+      <p>Итоговая структура папок:</p>
+
+<pre><code class="language-text">cuber/
+├── app/
+│   ├── include/
+│   ├── site/
+│   │   └── index.html
+│   └── main.cpp
+└── Makefile</code></pre>
+
+      <h2>Сборка контейнера</h2>
+
+      <p>Соберите образ:</p>
+
+<pre><code class="language-bash">docker build -t crown_app .</code></pre>
+
+      <p>Запустите контейнер с пробросом портов (у контейнера своё сетевое пространство, поэтому нужен параметр <code>-p</code>):</p>
+
+<pre><code class="language-bash">docker run -p 8080:8080 crown_app</code></pre>
+
+      <p>После запуска приложение доступно по адресу <a href="http://localhost:8080">http://localhost:8080</a></p>
+
+      <h1>2. Часть 2. Kubernetes</h1>
+
+      <p>Kubernetes - это система управления контейнеризированными приложениями на множестве машин, объединяющая их в единую систему - кластер.</p>
+
+      <img src="img/cluser.png" alt="Cluster">
+
+      <p>Кластер состоит из машин под управлением <code>Kubernetes</code>. Каждая такая машина называется <code>Node</code> (нода/узел).</p>
+
+      <h2>2.1 Node</h2>
+
+      <p>Node - машина, входящая в Kubernetes-кластер. Нодой может быть физический сервер, виртуальная машина или облачный инстанс.</p>
+
+      <p>Узлы бывают двух ролей.</p>
+
+      <img src="img/nodes.png" alt="Cluster">
+
+      <p><strong>Control Plane</strong> — управляющая часть Kubernetes. Она не содержит контейнеры приложений, а управляет состоянием кластера. Здесь принимаются решения:</p>
+      <ul>
+        <li>какие объекты должны существовать;</li>
+        <li>сколько экземпляров приложений должно быть запущено;</li>
+        <li>на какой Node поставить новый под;</li>
+        <li>нужно ли создавать новые поды;</li>
+        <li>соответствует ли текущее состояние (actual state) желаемому (desired state).</li>
+      </ul>
+
+      <p><strong>Worker Node</strong> — машина, на которой непосредственно работают приложения</p>
+
+      <img src="img/kuber_inside.png" alt="Kuber inside">
+
+      <img src="img/cluster.png" alt="Cluster">
+
+      <h2>2.2 Control Plane</h2>
+
+      <img src="img/main_pod.png" alt="Control Plane">
+
+      <p><strong>API Server</strong> - центральная точка взаимодействия с Kubernetes API. Через него пользователь создаёт объекты, компоненты Kubernetes читают и записывают состояние кластера, внешние инструменты взаимодействуют с Kubernetes.</p>
+
+      <p><strong>etcd</strong> - распределённое key-value хранилище, в котором Kubernetes хранит состояние своего API. Практически все компоненты Control Plane работают с etcd, но не напрямую, а через API Server.</p>
+
+      <p><strong>Scheduler</strong> - выбирает подходящую Node для размещения Pod, которому ещё не назначена машина. Важно: Scheduler не запускает контейнер, он лишь решает, где он будет запущен.</p>
+
+      <p><strong>Controllers</strong> - постоянно наблюдают за состоянием кластера и замечают несоответствия между желаемым и действительным состоянием, предпринимая действия по их согласованию (reconciliation loop).</p>
+
+      <h2>2.3 Worker Node</h2>
+
+      <img src="img/worker.png" alt="Worker Node">
+
+      <p><strong>kubelet</strong> - агент Kubernetes, работающий на конкретной ноде. Он следит за тем, чтобы поды, назначенные для этой машины, были запущены и соответствовали своей спецификации.</p>
+
+      <img src="img/sheduler_kublet_container.png" alt="Sheduler - Kublet - Container">
+
+      <h2>Итоговая архитектура Kuber</h2>
+      <img src="img/architecture.png" alt="Architecture">
+
+      <h1>Часть 3. Создание кластера с приложениями</h1>
+
+      <table class="table table-sm table-bordered">
+        <thead class="table-light">
+          <tr><th>Инструмент</th><th>Зачем он нам</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Docker</td><td>Позволит запустить учебную ноду в контейнере на нашем компьютере</td></tr>
+          <tr><td>kind</td><td>Создаст и настроит Kubernetes внутри этой ноды</td></tr>
+          <tr><td>kubectl</td><td>Позволит отправлять команды в Kubernetes</td></tr>
+        </tbody>
+      </table>
+
+      <h2>3.1 Создание кластера</h2>
+
+<pre><code class="language-bash">kind create cluster --name my-cluster --wait 180s</code></pre>
+
+      <p>Здесь:</p>
+      <ul>
+        <li>create cluster - создать кластер;</li>
+        <li>--name my-cluster - дать ему имя;</li>
+        <li>--wait 180s - подождать готовности управляющих компонентов до трёх минут.</li>
+      </ul>
+
+      <p>По умолчанию <strong>kind</strong> создаёт одну ноду. В маленьком учебном кластере одна нода может совмещать обе роли: на ней работают и управляющие компоненты, и наше приложение.</p>
+
+      <p>Установите активный контекст для <code>kubectl</code>:</p>
+
+<pre><code class="language-bash">kubectl config use-context my-cluster</code></pre>
+
+      <p>Для проверки связи используем команду:</p>
+
+<pre><code class="language-bash">kubectl cluster-info</code></pre>
+
+      <p>Вывод покажет адрес управляющей части кластера.</p>
+
+      <p>Полезные команды:</p>
+
+<pre><code class="language-bash">kubectl get nodes   # список нод
+kubectl get pods    # список подов
+kubectl run app --image=crown_app:latest   # запуск пода</code></pre>
+
+      <p>Здесь:</p>
+      <ul>
+        <li><code>app</code> - название пода</li>
+        <li><code>--image=crown_app:latest</code> - образ запускаемого контейнера</li>
+      </ul>
+
+      <p>Удаление кластера:</p>
+
+<pre><code class="language-bash">kind delete cluster --name my-cluster</code></pre>
+
+      <h2>3.2 Создание манифеста</h2>
+
+      <p>Чтобы не вводить команды многократно, создайте файл с описанием всех требований — Kubernetes-манифест:</p>
+
+<pre><code class="language-text">apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app-deploy
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - name: my-app
+        image: crown_app:latest
+        ports:
+          - containerPort: 8080</code></pre>
+
+      <p>В манифесте постоянно встречаются четыре поля:</p>
+      <ol>
+        <li><code>apiVersion</code></li>
+        <li><code>kind</code></li>
+        <li><code>metadata</code></li>
+        <li><code>spec</code></li>
+      </ol>
+
+      <p><strong>apiVersion</strong> - показывает <code>group/version</code>, в котором определён объект. Например, Deployment определён в <code>apps/v1</code>, а Pod — просто в <code>v1</code>. Запоминать все версии не нужно, достаточно понимать назначение поля.<br>
+      <strong>kind</strong> - отвечает на вопрос, какой Kubernetes-объект мы описываем: <code>Pod</code>, <code>Deployment</code>, <code>Service</code>, <code>ConfigMap</code> и т.д.<br>
+      <strong>metadata</strong> - информация об объекте, например его имя:</p>
+
+<pre><code class="language-text">metadata:
+    name: my-app</code></pre>
+
+      <p><strong>Deployment</strong> — объект, который управляет репликами подов и обеспечивает их заданное количество</p>
+
+      <p><strong>spec</strong> - желаемая конфигурация создаваемого объекта. Например, «я хочу три replicas (экземпляра)»:</p>
+
+<pre><code class="language-text">spec:
+    replicas: 3</code></pre>
+
+      <img src="img/manifest.png" alt="Manifest">
+
+      <h3>template</h3>
+
+      <p><code>template</code> - шаблон будущего пода. Он описывает, какие поды необходимо создать:</p>
+
+<pre><code class="language-text">template:
+    metadata:
+        labels:
+            app: my-app
+    spec:
+        containers:
+            - name: my-app
+              image: crown_app:latest
+              ports:
+                - containerPort: 8080</code></pre>
+
+      <p>Внутри <code>template.spec</code> находятся контейнеры:</p>
+
+<pre><code class="language-text">containers:
+    - name: my-app
+      image: crown_app:latest</code></pre>
+
+      <p>Это читается так: в каждом созданном <code>Pod</code> должен работать контейнер с именем <code>my-app</code>, созданный на образе <code>crown_app:latest</code>. <code>containers</code> - список, поэтому перед контейнером стоит дефис. В одном поде может работать сразу несколько контейнеров — важная концепция, на которой строится множество паттернов распределённых приложений.</p>
+
+      <p>Конструкция <code>selector.matchLabels</code> используется для логического связывания компонентов кластера:</p>
+      <ul>
+        <li><strong>В Deployment:</strong> указывает контроллеру, какими именно подами он должен управлять и сколько их реплик поддерживать в живых.</li>
+        <li><strong>В Service:</strong> указывает балансировщику трафика, на какие именно поды перенаправлять сетевые запросы.</li>
+      </ul>
+
+      <p><strong>Важно:</strong> Значение <code>app: my-app</code> в блоке <code>selector.matchLabels</code> должно <strong>строго совпадать</strong> с меткой (labels) в шаблоне пода (<code>template.metadata.labels</code>), иначе Kubernetes выдаст ошибку валидации.</p>
+
+      <p>Для загрузки манифеста выполните:</p>
+
+<pre><code class="language-bash">kubectl apply -f deployment.yaml</code></pre>
+
+      <h1>4 Объекдинение и запуск приложения</h1>
+
+      <p>Добавляем в <code>Makefile</code> следующие строки:</p>
+
+<pre><code class="language-makefile">start-cluster:
+	@sudo kind create cluster --name my-cluster --wait 120s
+
+	# загрузка тяжелеого образа в кластер kind
+	@sudo kind load docker-image crown_app:latest --name my-cluster
+	
+	@sudo kubectl apply -f app.yaml
+
+	@sudo kubectl rollout status deployment/my-app-deploy --timeout=90s # ожидание развертывания
+	
+	@sudo kubectl port-forward deployment/my-app-deploy 8080:8080
+
+stop-cluster:
+	@sudo kind delete cluster --name my-cluster</code></pre>
+
+      <p>Далее что бы запустить кластер с приложениями можно следующей командой:</p>
+
+<pre><code class="language-bash">sudo make start-cluster</code></pre>
+
+      <p>Для остановки:</p>
+
+<pre><code class="language-bash">sudo make stop-cluster</code></pre>
+
+    </article>
+  </main>
+
+  <footer class="text-center text-muted py-3">
+    <small>Источник: sourcecraft.dev/mishka752/cuber</small>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
